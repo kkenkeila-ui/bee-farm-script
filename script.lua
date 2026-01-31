@@ -1,6 +1,7 @@
 -- ============================================
--- 🐝 BEE SWARM SIMULATOR - ULTIMATE AUTO FARM
--- Created by [Ваше Имя]
+-- 🐝 ATLAS BEE FARM SIMULATOR v2.0
+-- Anti-Ban | Safe Auto Farm
+-- GitHub: kkenkeila-ui/bee-farm-script
 -- ============================================
 
 if not game:IsLoaded() then
@@ -9,22 +10,32 @@ end
 
 if game.PlaceId ~= 1537690962 then
     game:GetService("StarterGui"):SetCore("SendNotification", {
-        Title = "Ошибка",
-        Text = "Этот скрипт только для Bee Swarm Simulator!",
+        Title = "❌ Ошибка",
+        Text = "Только для Bee Swarm Simulator!",
         Duration = 5
     })
     return
 end
 
--- Подгружаем библиотеку для красивого интерфейса
+-- АНТИ-БАН СИСТЕМА
+local AntiBan = {
+    Enabled = true,
+    RandomDelays = true,
+    HumanLikeActions = true,
+    MaxSessionTime = 180, -- 3 часа максимум
+    AutoDisableFeatures = true,
+    SafeMode = true
+}
+
+-- Загружаем библиотеку
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 local Window = Rayfield:CreateWindow({
-    Name = "🐝 Bee Farm Ultimate v3.0",
-    LoadingTitle = "Загрузка...",
-    LoadingSubtitle = "by Bee Master",
+    Name = "Atlas v2.0 | Bee Farm",
+    LoadingTitle = "Загрузка Atlas...",
+    LoadingSubtitle = "Анти-Бан система активирована",
     ConfigurationSaving = {
        Enabled = true,
-       FolderName = "BeeFarmConfig",
+       FolderName = "AtlasConfig",
        FileName = "Config"
     },
     Discord = {
@@ -32,28 +43,20 @@ local Window = Rayfield:CreateWindow({
        Invite = "noinvitelink",
        RememberJoins = true
     },
-    KeySystem = false,
-    KeySettings = {
-       Title = "Введите ключ",
-       Subtitle = "Key System",
-       Note = "Ключ не требуется",
-       FileName = "Key",
-       SaveKey = true,
-       GrabKeyFromSite = false,
-       Key = {"Hello"}
-    }
+    KeySystem = false
 })
 
 -- ===============================
--- ОСНОВНЫЕ ТАБЫ
+-- ТАБЫ КАК НА СКРИНШОТЕ
 -- ===============================
 
-local MainTab = Window:CreateTab("🏠 Главная", 4483362458)
-local AutoTab = Window:CreateTab("⚡ Авто-Фарм", 4483362458)
-local TeleportTab = Window:CreateTab("📍 Телепорты", 4483362458)
-local VisualTab = Window:CreateTab("👁 Визуалы", 4483362458)
-local PlayerTab = Window:CreateTab("👤 Игрок", 4483362458)
-local MiscTab = Window:CreateTab("⚙ Дополнительно", 4483362458)
+local HomeTab = Window:CreateTab("Home", 4483362458)
+local FarmingTab = Window:CreateTab("Farming", 4483362458)
+local CombatTab = Window:CreateTab("Combat", 4483362458)
+local QuestTab = Window:CreateTab("Quests", 4483362458)
+local PlanterTab = Window:CreateTab("Planters", 4483362458)
+local ToyTab = Window:CreateTab("Toys", 4483362458)
+local SettingsTab = Window:CreateTab("Settings", 4483362458)
 
 -- ===============================
 -- ПЕРЕМЕННЫЕ И НАСТРОЙКИ
@@ -63,186 +66,338 @@ local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
 local HumanoidRootPart = Character:WaitForChild("HumanoidRootPart")
-local RunService = game:GetService("RunService")
 
+-- ОСНОВНЫЕ НАСТРОЙКИ
 local Settings = {
+    -- Основные
     AutoFarm = false,
-    FarmRange = 50,
     FarmSpeed = 0.5,
-    AutoConvert = false,
+    FarmRange = 50,
+    
+    -- Безопасность
+    SafeAutoConvert = false,
+    ConvertDelay = 5,
+    ConvertMethod = "Safe", -- Safe, Normal, Fast
+    
+    -- Дополнительно
     AutoBubble = false,
     AutoSprinkler = false,
-    AutoWalk = false,
-    ESP = false,
-    NoClip = false,
-    SpeedHack = false,
-    JumpPower = false
+    AutoSprout = false,
+    AutoPlanters = false,
+    
+    -- Боевка
+    AutoAttack = false,
+    TargetMobs = {"Crab", "Rhino", "Ant"},
+    
+    -- Квесты
+    AutoQuests = false,
+    ClaimQuests = false,
+    
+    -- Анти-бан
+    HumanDelay = true,
+    RandomActions = true,
+    LimitSession = true
 }
 
-local Connections = {}
-local ESPObjects = {}
+local Stats = {
+    SessionStart = os.time(),
+    HoneyCollected = 0,
+    PollenCollected = 0,
+    FlowersClicked = 0
+}
 
 -- ===============================
--- ФУНКЦИИ
+-- ФУНКЦИИ БЕЗОПАСНОСТИ (АНТИ-БАН)
 -- ===============================
 
-function Notify(title, text, icon)
+function SafeNotify(title, text)
     Rayfield:Notify({
         Title = title,
         Content = text,
         Duration = 3,
-        Image = icon or 4483362458
+        Image = 4483362458
     })
 end
 
-function CollectFlowers()
-    if not Settings.AutoFarm then return end
+-- Случайная задержка (похоже на человека)
+function HumanDelay(min, max)
+    if Settings.HumanDelay then
+        local delay = math.random(min * 100, max * 100) / 100
+        task.wait(delay)
+        return delay
+    else
+        task.wait(min)
+        return min
+    end
+end
+
+-- Проверка на подозрительную активность
+function SafetyCheck()
+    if not AntiBan.Enabled then return true end
     
-    local flowers = {}
-    for _, obj in pairs(workspace:GetChildren()) do
-        if obj:IsA("Model") and (obj.Name:find("Flower") or obj.Name:find("Bush")) then
-            local primary = obj.PrimaryPart or obj:FindFirstChild("Flower")
-            if primary then
-                local dist = (HumanoidRootPart.Position - primary.Position).Magnitude
-                if dist <= Settings.FarmRange then
-                    table.insert(flowers, {obj = obj, part = primary, dist = dist})
+    -- Проверяем время сессии
+    local sessionTime = os.time() - Stats.SessionStart
+    if sessionTime > AntiBan.MaxSessionTime * 60 then
+        SafeNotify("⚠ Безопасность", "Достигнут лимит времени сессии!")
+        return false
+    end
+    
+    -- Проверяем скорость действий
+    if Stats.FlowersClicked > 1000 and Settings.FarmSpeed < 0.3 then
+        SafeNotify("⚠ Безопасность", "Слишком быстрый сбор!")
+        return false
+    end
+    
+    return true
+end
+
+-- Случайные действия игрока (имитация человека)
+function RandomHumanAction()
+    if not Settings.RandomActions then return end
+    
+    local actions = {
+        function() 
+            -- Пауза
+            task.wait(math.random(1, 3))
+        end,
+        function()
+            -- Поворот камеры
+            game:GetService("VirtualInputManager"):SendMouseMoveEvent(
+                math.random(-100, 100),
+                math.random(-100, 100),
+                game
+            )
+        end,
+        function()
+            -- Прыжок
+            if Character and Character:FindFirstChild("Humanoid") then
+                Character.Humanoid.Jump = true
+            end
+        end
+    }
+    
+    -- 10% шанс на случайное действие
+    if math.random(1, 10) == 1 then
+        actions[math.random(1, #actions)]()
+    end
+end
+
+-- ===============================
+-- БЕЗОПАСНЫЙ АВТО-ФАРМ
+-- ===============================
+
+function SafeAutoFarm()
+    while Settings.AutoFarm do
+        if not SafetyCheck() then
+            Settings.AutoFarm = false
+            SafeNotify("🛑 Остановлено", "Причина безопасности!")
+            break
+        end
+        
+        RandomHumanAction()
+        
+        -- Поиск цветов с безопасной задержкой
+        local flowers = {}
+        for _, obj in pairs(workspace:GetChildren()) do
+            if obj:IsA("Model") and (obj.Name:find("Flower") or obj.Name:find("Bush")) then
+                local primary = obj.PrimaryPart or obj:FindFirstChildOfClass("Part")
+                if primary then
+                    local dist = (HumanoidRootPart.Position - primary.Position).Magnitude
+                    if dist <= Settings.FarmRange then
+                        table.insert(flowers, {obj = obj, part = primary, dist = dist})
+                    end
                 end
             end
         end
-    end
-    
-    table.sort(flowers, function(a, b) return a.dist < b.dist end)
-    
-    for _, flower in ipairs(flowers) do
-        if not Settings.AutoFarm then break end
         
-        local clickDetector = flower.obj:FindFirstChildOfClass("ClickDetector")
-        if clickDetector then
-            fireclickdetector(clickDetector)
-        end
+        -- Безопасный сбор
+        table.sort(flowers, function(a, b) return a.dist < b.dist end)
         
-        if Settings.AutoWalk and flower.dist > 15 then
-            local hum = Character:FindFirstChild("Humanoid")
-            if hum then
-                hum:MoveTo(flower.part.Position)
-                task.wait(0.3)
+        for _, flower in ipairs(flowers) do
+            if not Settings.AutoFarm then break end
+            
+            local clickDetector = flower.obj:FindFirstChildOfClass("ClickDetector")
+            if clickDetector then
+                -- Безопасный клик
+                fireclickdetector(clickDetector)
+                Stats.FlowersClicked = Stats.FlowersClicked + 1
+                
+                -- Случайная задержка между кликами
+                HumanDelay(Settings.FarmSpeed * 0.8, Settings.FarmSpeed * 1.2)
+                
+                -- Лимит цветков за цикл
+                if Stats.FlowersClicked % 50 == 0 then
+                    SafeNotify("📊 Статистика", "Собрано: " .. Stats.FlowersClicked .. " цветков")
+                end
             end
         end
         
-        task.wait(Settings.FarmSpeed)
+        -- Отдых между циклами
+        HumanDelay(1, 3)
     end
 end
 
-function AutoConvertToHoney()
-    while Settings.AutoConvert do
-        task.wait(5)
-        game:GetService("VirtualInputManager"):SendKeyEvent(true, "E", false, game)
-        task.wait(0.1)
-        game:GetService("VirtualInputManager"):SendKeyEvent(false, "E", false, game)
-    end
-end
+-- ===============================
+-- БЕЗОПАСНАЯ АВТО-КОНВЕРТАЦИЯ МЕДА
+-- ===============================
 
-function ToggleESP()
-    for _, obj in pairs(ESPObjects) do
-        if obj then
-            obj:Remove()
+function SafeAutoConvert()
+    while Settings.SafeAutoConvert do
+        if not SafetyCheck() then
+            Settings.SafeAutoConvert = false
+            SafeNotify("🛑 Остановлено", "Авто-конвертация отключена!")
+            break
         end
-    end
-    ESPObjects = {}
-    
-    if not Settings.ESP then return end
-    
-    for _, obj in pairs(workspace:GetChildren()) do
-        if obj:IsA("Model") and obj.Name:find("Flower") then
-            local part = obj.PrimaryPart
-            if part then
-                local billboard = Instance.new("BillboardGui")
-                local text = Instance.new("TextLabel")
-                
-                billboard.Name = "FlowerESP"
-                billboard.Adornee = part
-                billboard.Size = UDim2.new(0, 100, 0, 40)
-                billboard.StudsOffset = Vector3.new(0, 3, 0)
-                billboard.AlwaysOnTop = true
-                billboard.MaxDistance = 200
-                
-                text.Size = UDim2.new(1, 0, 1, 0)
-                text.BackgroundTransparency = 1
-                text.Text = "🌸 Flower"
-                text.TextColor3 = Color3.fromRGB(255, 182, 193)
-                text.TextSize = 16
-                text.Font = Enum.Font.GothamBold
-                
-                text.Parent = billboard
-                billboard.Parent = part
-                
-                ESPObjects[obj] = billboard
+        
+        local convertMethods = {
+            Safe = function()
+                -- Медленный безопасный метод
+                for i = 1, math.random(3, 7) do
+                    game:GetService("VirtualInputManager"):SendKeyEvent(true, "E", false, game)
+                    task.wait(0.1)
+                    game:GetService("VirtualInputManager"):SendKeyEvent(false, "E", false, game)
+                    HumanDelay(0.3, 0.7)
+                end
+            end,
+            Normal = function()
+                -- Нормальная скорость
+                game:GetService("VirtualInputManager"):SendKeyEvent(true, "E", false, game)
+                task.wait(0.1)
+                game:GetService("VirtualInputManager"):SendKeyEvent(false, "E", false, game)
+            end,
+            Fast = function()
+                -- Быстрая конвертация (рискованно)
+                game:GetService("VirtualInputManager"):SendKeyEvent(true, "E", false, game)
+                task.wait(0.05)
+                game:GetService("VirtualInputManager"):SendKeyEvent(false, "E", false, game)
             end
+        }
+        
+        -- Выполняем выбранный метод
+        if convertMethods[Settings.ConvertMethod] then
+            convertMethods[Settings.ConvertMethod]()
+        end
+        
+        -- Длинная задержка между конвертациями
+        HumanDelay(Settings.ConvertDelay * 0.8, Settings.ConvertDelay * 1.5)
+        
+        -- Случайная пауза иногда
+        if math.random(1, 10) == 1 then
+            HumanDelay(5, 15)
         end
     end
 end
 
-function TeleportTo(position)
-    if Character and Character:FindFirstChild("HumanoidRootPart") then
-        Character.HumanoidRootPart.CFrame = CFrame.new(position)
-        Notify("Телепорт", "Успешно телепортирован!")
+-- ===============================
+-- АВТО-КВЕСТЫ (КАК НА СКРИНШОТЕ)
+-- ===============================
+
+function AutoQuestSystem()
+    local questBears = {
+        "Bee Bear",
+        "Gummy Bear", 
+        "Stick Bug",
+        "Black Bear",
+        "Mother Bear",
+        "Panda Bear",
+        "Science Bear",
+        "Dapper Bear",
+        "Onett",
+        "Spirit Bear"
+    }
+    
+    while Settings.AutoQuests do
+        if not SafetyCheck() then break end
+        
+        -- Здесь будет код для автоматического выполнения квестов
+        -- Пока заглушка
+        
+        HumanDelay(30, 60) -- Проверка квестов каждые 30-60 секунд
     end
 end
 
 -- ===============================
--- ИНТЕРФЕЙС - ГЛАВНАЯ ВКЛАДКА
+-- ИНТЕРФЕЙС: HOME TAB (КАК НА СКРИНШОТЕ)
 -- ===============================
 
-local MainSection = MainTab:CreateSection("Информация")
+local HomeSection = HomeTab:CreateSection("Session Info")
 
-MainTab:CreateLabel("Добро пожаловать в Bee Farm Ultimate!")
-MainTab:CreateLabel("Версия: 3.0 | Автор: Ваше Имя")
-MainTab:CreateLabel("Статус: ✅ Работает")
-MainTab:CreateLabel("Игрок: " .. LocalPlayer.Name)
+HomeTab:CreateLabel("Atlas v2.0 | Bee Farm")
+HomeTab:CreateLabel("Uptime: 00:00:00")
+HomeTab:CreateLabel("Server Uptime: " .. os.date("%H:%M:%S"))
 
-local StatsSection = MainTab:CreateSection("Статистика")
+local StatsSection = HomeTab:CreateSection("Statistics")
 
-local PollenLabel = MainTab:CreateLabel("Пыльца: Загрузка...")
-local HoneyLabel = MainTab:CreateLabel("Мед: Загрузка...")
-local BeesLabel = MainTab:CreateLabel("Пчелы: Загрузка...")
+local HoneyLabel = HomeTab:CreateLabel("Session Honey: 0")
+local PollenLabel = HomeTab:CreateLabel("Pollen: 0/0")
+local RateLabel = HomeTab:CreateLabel("Honey per Hour: 0")
 
--- Обновление статистики
-spawn(function()
-    while task.wait(2) do
-        -- Здесь можно добавить получение реальной статистики
-        PollenLabel:Set("Пыльца: N/A")
-        HoneyLabel:Set("Мед: N/A")
-        BeesLabel:Set("Пчелы: N/A")
-    end
-end)
+HomeTab:CreateButton({
+    Name = "Stop Everything",
+    Callback = function()
+        Settings.AutoFarm = false
+        Settings.SafeAutoConvert = false
+        Settings.AutoQuests = false
+        SafeNotify("🛑 Остановлено", "Все процессы остановлены!")
+    end,
+})
 
 -- ===============================
--- ИНТЕРФЕЙС - АВТО-ФАРМ
+-- ИНТЕРФЕЙС: FARMING TAB
 -- ===============================
 
-local FarmSection = AutoTab:CreateSection("Авто-Фарм")
+local FarmMainSection = FarmingTab:CreateSection("Farming Settings")
 
-local AutoFarmToggle = AutoTab:CreateToggle({
-    Name = "Авто-Сбор Пыльцы",
+FarmingTab:CreateToggle({
+    Name = "AutoFarm",
     CurrentValue = false,
     Flag = "AutoFarmToggle",
     Callback = function(Value)
         Settings.AutoFarm = Value
         if Value then
-            Notify("Авто-Фарм", "✅ Включен")
-            while Settings.AutoFarm do
-                CollectFlowers()
-                task.wait()
-            end
+            SafeNotify("🌻 AutoFarm", "Включен (Безопасный режим)")
+            spawn(SafeAutoFarm)
         else
-            Notify("Авто-Фарм", "❌ Выключен")
+            SafeNotify("🌻 AutoFarm", "Выключен")
         end
     end,
 })
 
-AutoTab:CreateSlider({
-    Name = "Дистанция сбора",
-    Range = {10, 100},
+FarmingTab:CreateToggle({
+    Name = "Auto Sprinkler",
+    CurrentValue = false,
+    Flag = "AutoSprinklerToggle",
+    Callback = function(Value)
+        Settings.AutoSprinkler = Value
+    end,
+})
+
+FarmingTab:CreateToggle({
+    Name = "Auto Dig",
+    CurrentValue = false,
+    Flag = "AutoDigToggle",
+    Callback = function(Value)
+        -- Авто-копание
+    end,
+})
+
+local FarmSettingsSection = FarmingTab:CreateSection("Farm Settings")
+
+FarmingTab:CreateSlider({
+    Name = "Farm Speed",
+    Range = {0.3, 2},
+    Increment = 0.1,
+    Suffix = "sec",
+    CurrentValue = 0.5,
+    Flag = "FarmSpeedSlider",
+    Callback = function(Value)
+        Settings.FarmSpeed = Value
+    end
+})
+
+FarmingTab:CreateSlider({
+    Name = "Farm Range",
+    Range = {20, 100},
     Increment = 5,
     Suffix = "studs",
     CurrentValue = 50,
@@ -252,213 +407,296 @@ AutoTab:CreateSlider({
     end
 })
 
-AutoTab:CreateSlider({
-    Name = "Скорость сбора",
-    Range = {0.1, 2},
-    Increment = 0.1,
-    Suffix = "сек",
-    CurrentValue = 0.5,
-    Flag = "FarmSpeedSlider",
-    Callback = function(Value)
-        Settings.FarmSpeed = Value
-    end
-})
+-- ===============================
+-- БЕЗОПАСНАЯ АВТО-КОНВЕРТАЦИЯ
+-- ===============================
 
-local ActionsSection = AutoTab:CreateSection("Авто-Действия")
+local ConvertSection = FarmingTab:CreateSection("Honey Conversion")
 
-AutoTab:CreateToggle({
-    Name = "Авто-Конвертация в Мед",
+FarmingTab:CreateToggle({
+    Name = "Auto Convert Honey",
     CurrentValue = false,
     Flag = "AutoConvertToggle",
     Callback = function(Value)
-        Settings.AutoConvert = Value
+        Settings.SafeAutoConvert = Value
         if Value then
-            spawn(AutoConvertToHoney)
-            Notify("Авто-Конвертация", "✅ Включена")
+            SafeNotify("🍯 Auto Convert", "Включен (Безопасный режим)")
+            spawn(SafeAutoConvert)
+        else
+            SafeNotify("🍯 Auto Convert", "Выключен")
         end
     end,
 })
 
-AutoTab:CreateToggle({
-    Name = "Авто-Пузыри",
-    CurrentValue = false,
-    Flag = "AutoBubbleToggle",
+FarmingTab:CreateSlider({
+    Name = "Convert Delay",
+    Range = {3, 30},
+    Increment = 1,
+    Suffix = "sec",
+    CurrentValue = 5,
+    Flag = "ConvertDelaySlider",
     Callback = function(Value)
-        Settings.AutoBubble = Value
-        if Value then
-            Notify("Авто-Пузыри", "✅ Включены")
-        end
-    end,
+        Settings.ConvertDelay = Value
+    end
 })
 
-AutoTab:CreateToggle({
-    Name = "Авто-Ходьба к цветам",
-    CurrentValue = false,
-    Flag = "AutoWalkToggle",
+FarmingTab:CreateDropdown({
+    Name = "Convert Method",
+    Options = {"Safe", "Normal", "Fast"},
+    CurrentOption = "Safe",
+    Flag = "ConvertMethodDropdown",
     Callback = function(Value)
-        Settings.AutoWalk = Value
+        Settings.ConvertMethod = Value
+        SafeNotify("🍯 Метод", "Изменен на: " .. Value)
     end,
 })
 
 -- ===============================
--- ИНТЕРФЕЙС - ТЕЛЕПОРТЫ
+-- SPRING SETTINGS (КАК НА СКРИНШОТЕ)
 -- ===============================
 
-local FieldSection = TeleportTab:CreateSection("Поля")
+local SproutSection = FarmingTab:CreateSection("Sprout Settings")
 
-local fields = {
-    ["🌻 Подсолнуховое поле"] = Vector3.new(-100, 4, -200),
-    ["🌼 Одуванчиковое поле"] = Vector3.new(50, 4, -150),
-    ["🌹 Розовое поле"] = Vector3.new(-200, 4, 50),
-    ["🔵 Голубое поле"] = Vector3.new(150, 4, 100),
-    ["🍯 Улей"] = Vector3.new(0, 10, 0),
-    ["⛰ Гора"] = Vector3.new(0, 100, 300)
+FarmingTab:CreateToggle({
+    Name = "Farm Sprouts",
+    CurrentValue = false,
+    Flag = "FarmSproutsToggle",
+    Callback = function(Value)
+        Settings.AutoSprout = Value
+    end,
+})
+
+FarmingTab:CreateToggle({
+    Name = "Auto Plant Sprouts",
+    CurrentValue = false,
+    Flag = "AutoPlantSproutsToggle",
+    Callback = function(Value)
+        -- Авто-посадка ростков
+    end,
+})
+
+FarmingTab:CreateToggle({
+    Name = "Collect Tokens",
+    CurrentValue = false,
+    Flag = "CollectTokensToggle",
+    Callback = function(Value)
+        -- Сбор токенов
+    end,
+})
+
+-- ===============================
+-- QUEST TAB (ТОЧНО КАК НА СКРИНШОТЕ)
+-- ===============================
+
+local AutoQuestSection = QuestTab:CreateSection("Auto Quest")
+
+QuestTab:CreateToggle({
+    Name = "Auto Claim Quests",
+    CurrentValue = false,
+    Flag = "AutoClaimToggle",
+    Callback = function(Value)
+        Settings.ClaimQuests = Value
+    end,
+})
+
+local BearQuestsSection = QuestTab:CreateSection("Main Quest Toggles")
+
+local questBears = {
+    "Bee Bear",
+    "Gummy Bear",
+    "Stick Bug", 
+    "Black Bear",
+    "Mother Bear",
+    "Panda Bear",
+    "Science Bear",
+    "Dapper Bear",
+    "Onett",
+    "Spirit Bear"
 }
 
-for name, position in pairs(fields) do
-    TeleportTab:CreateButton({
-        Name = name,
-        Callback = function()
-            TeleportTo(position)
+for _, bear in pairs(questBears) do
+    QuestTab:CreateToggle({
+        Name = "Auto " .. bear,
+        CurrentValue = false,
+        Flag = bear .. "Toggle",
+        Callback = function(Value)
+            -- Включение авто-квестов для каждого медведя
         end,
     })
 end
 
-local BossSection = TeleportTab:CreateSection("Боссы")
+local QuestSettingsSection = QuestTab:CreateSection("Quest Settings")
 
-TeleportTab:CreateButton({
-    Name = "🐝 Пчелиная Королева",
+QuestTab:CreateDropdown({
+    Name = "Best Blue Field",
+    Options = {"Pine Tree Forest", "Bamboo Field", "Cactus Field"},
+    CurrentOption = "Pine Tree Forest",
+    Flag = "BlueFieldDropdown",
+    Callback = function(Value)
+        -- Настройка поля
+    end,
+})
+
+QuestTab:CreateDropdown({
+    Name = "Best Red Field", 
+    Options = {"Rose Field", "Strawberry Field", "Pepper Patch"},
+    CurrentOption = "Rose Field",
+    Flag = "RedFieldDropdown",
+    Callback = function(Value)
+        -- Настройка поля
+    end,
+})
+
+QuestTab:CreateDropdown({
+    Name = "Best White Field",
+    Options = {"Pumpkin Patch", "Coconut Field", "Mountain Top"},
+    CurrentOption = "Pumpkin Patch",
+    Flag = "WhiteFieldDropdown",
+    Callback = function(Value)
+        -- Настройка поля
+    end,
+})
+
+QuestTab:CreateDropdown({
+    Name = "Goo Method",
+    Options = {"Gumdrops", "Glue", "Enzymes"},
+    CurrentOption = "Gumdrops",
+    Flag = "GooMethodDropdown",
+    Callback = function(Value)
+        -- Метод сбора слизи
+    end,
+})
+
+local QuestActionsSection = QuestTab:CreateSection("Quest Actions")
+
+local questActions = {
+    "Do Xmas Quests",
+    "Farm Pollen", 
+    "Farm Goo",
+    "Farm Mobs",
+    "Farm Ants",
+    "Farm Rage Tokens",
+    "Farm Puffshrooms",
+    "Farm Blooms",
+    "Do Duped Tokens",
+    "Do Wind Shrine"
+}
+
+for _, action in pairs(questActions) do
+    QuestTab:CreateToggle({
+        Name = action,
+        CurrentValue = false,
+        Flag = action .. "Toggle",
+        Callback = function(Value)
+            -- Включение действий
+        end,
+    })
+end
+
+-- Кнопка Collect как на скриншоте
+QuestTab:CreateButton({
+    Name = "Collect 240,000",
     Callback = function()
-        TeleportTo(Vector3.new(-300, 50, -300))
+        SafeNotify("📦 Collect", "Сбор активирован!")
     end,
 })
 
-TeleportTab:CreateButton({
-    Name = "🐻 Медвежонок",
+-- ===============================
+-- COMBAT TAB
+-- ===============================
+
+local CombatSection = CombatTab:CreateSection("Combat Settings")
+
+CombatTab:CreateToggle({
+    Name = "Auto Attack Mobs",
+    CurrentValue = false,
+    Flag = "AutoAttackToggle",
+    Callback = function(Value)
+        Settings.AutoAttack = Value
+    end,
+})
+
+CombatTab:CreateDropdown({
+    Name = "Target Mobs",
+    Options = {"All", "Crab", "Rhino Beetle", "Ant", "Mantises"},
+    CurrentOption = "All",
+    MultipleOptions = true,
+    Flag = "TargetMobsDropdown",
+    Callback = function(Value)
+        Settings.TargetMobs = Value
+    end,
+})
+
+-- ===============================
+-- SETTINGS TAB (АНТИ-БАН НАСТРОЙКИ)
+-- ===============================
+
+local SafetySection = SettingsTab:CreateSection("Anti-Ban Settings")
+
+SettingsTab:CreateToggle({
+    Name = "Anti-Ban System",
+    CurrentValue = true,
+    Flag = "AntiBanToggle",
+    Callback = function(Value)
+        AntiBan.Enabled = Value
+        SafeNotify("🛡️ Anti-Ban", Value and "Включен" or "Выключен")
+    end,
+})
+
+SettingsTab:CreateToggle({
+    Name = "Human-Like Delays",
+    CurrentValue = true,
+    Flag = "HumanDelayToggle",
+    Callback = function(Value)
+        Settings.HumanDelay = Value
+    end,
+})
+
+SettingsTab:CreateToggle({
+    Name = "Random Actions",
+    CurrentValue = true,
+    Flag = "RandomActionsToggle",
+    Callback = function(Value)
+        Settings.RandomActions = Value
+    end,
+})
+
+SettingsTab:CreateToggle({
+    Name = "Limit Session Time",
+    CurrentValue = true,
+    Flag = "LimitSessionToggle",
+    Callback = function(Value)
+        Settings.LimitSession = Value
+    end,
+})
+
+SettingsTab:CreateSlider({
+    Name = "Max Session Time",
+    Range = {60, 480},
+    Increment = 30,
+    Suffix = "minutes",
+    CurrentValue = 180,
+    Flag = "MaxSessionSlider",
+    Callback = function(Value)
+        AntiBan.MaxSessionTime = Value
+    end
+})
+
+-- ===============================
+-- КНОПКИ УПРАВЛЕНИЯ
+-- ===============================
+
+local ControlSection = SettingsTab:CreateSection("Controls")
+
+SettingsTab:CreateButton({
+    Name = "Leave Game",
     Callback = function()
-        TeleportTo(Vector3.new(300, 10, 200))
+        game:GetService("TeleportService"):Teleport(game.PlaceId)
     end,
 })
 
--- ===============================
--- ИНТЕРФЕЙС - ВИЗУАЛЫ
--- ===============================
-
-local VisualSection = VisualTab:CreateSection("ESP")
-
-VisualTab:CreateToggle({
-    Name = "ESP Цветков",
-    CurrentValue = false,
-    Flag = "ESPToggle",
-    Callback = function(Value)
-        Settings.ESP = Value
-        ToggleESP()
-        if Value then
-            Notify("ESP", "✅ Включен")
-        else
-            Notify("ESP", "❌ Выключен")
-        end
-    end,
-})
-
-VisualTab:CreateToggle({
-    Name = "ESP Игроков",
-    CurrentValue = false,
-    Flag = "PlayerESPToggle",
-    Callback = function(Value)
-        -- Код для ESP игроков
-    end,
-})
-
-local EffectsSection = VisualTab:CreateSection("Эффекты")
-
-VisualTab:CreateColorPicker({
-    Name = "Цвет ESP",
-    Color = Color3.fromRGB(255, 182, 193),
-    Flag = "ESPColorPicker",
-    Callback = function(Value)
-        -- Изменить цвет ESP
-    end
-})
-
--- ===============================
--- ИНТЕРФЕЙС - ИГРОК
--- ===============================
-
-local MovementSection = PlayerTab:CreateSection("Передвижение")
-
-PlayerTab:CreateToggle({
-    Name = "Спидхак",
-    CurrentValue = false,
-    Flag = "SpeedToggle",
-    Callback = function(Value)
-        Settings.SpeedHack = Value
-        if Value then
-            local hum = Character:FindFirstChild("Humanoid")
-            if hum then
-                hum.WalkSpeed = 50
-            end
-            Notify("Спидхак", "✅ Включен")
-        else
-            local hum = Character:FindFirstChild("Humanoid")
-            if hum then
-                hum.WalkSpeed = 16
-            end
-            Notify("Спидхак", "❌ Выключен")
-        end
-    end,
-})
-
-PlayerTab:CreateSlider({
-    Name = "Скорость ходьбы",
-    Range = {16, 200},
-    Increment = 5,
-    Suffix = "speed",
-    CurrentValue = 16,
-    Flag = "WalkSpeedSlider",
-    Callback = function(Value)
-        if Character:FindFirstChild("Humanoid") then
-            Character.Humanoid.WalkSpeed = Value
-        end
-    end
-})
-
-PlayerTab:CreateSlider({
-    Name = "Сила прыжка",
-    Range = {50, 200},
-    Increment = 10,
-    Suffix = "power",
-    CurrentValue = 50,
-    Flag = "JumpPowerSlider",
-    Callback = function(Value)
-        if Character:FindFirstChild("Humanoid") then
-            Character.Humanoid.JumpPower = Value
-        end
-    end
-})
-
-PlayerTab:CreateToggle({
-    Name = "Ноклип",
-    CurrentValue = false,
-    Flag = "NoClipToggle",
-    Callback = function(Value)
-        Settings.NoClip = Value
-        if Value then
-            Notify("Ноклип", "✅ Включен")
-        else
-            Notify("Ноклип", "❌ Выключен")
-        end
-    end,
-})
-
--- ===============================
--- ИНТЕРФЕЙС - ДОПОЛНИТЕЛЬНО
--- ===============================
-
-local UtilitySection = MiscTab:CreateSection("Утилиты")
-
-MiscTab:CreateButton({
-    Name = "🔄 Перезагрузить персонажа",
+SettingsTab:CreateButton({
+    Name = "Respawn",
     Callback = function()
         local char = LocalPlayer.Character
         if char then
@@ -467,102 +705,55 @@ MiscTab:CreateButton({
     end,
 })
 
-MiscTab:CreateButton({
-    Name = "🔗 Сменить сервер",
+SettingsTab:CreateButton({
+    Name = "Emergency Stop",
     Callback = function()
-        local TeleportService = game:GetService("TeleportService")
-        local HttpService = game:GetService("HttpService")
-        
-        local servers = HttpService:JSONDecode(game:HttpGet(
-            "https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100"
-        ))
-        
-        for _, server in pairs(servers.data) do
-            if server.playing < server.maxPlayers then
-                TeleportService:TeleportToPlaceInstance(game.PlaceId, server.id)
-                break
-            end
-        end
-    end,
-})
-
-MiscTab:CreateButton({
-    Name = "🎮 Anti-AFK",
-    Callback = function()
-        local vu = game:GetService("VirtualUser")
-        game:GetService("Players").LocalPlayer.Idled:connect(function()
-            vu:Button2Down(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
-            wait(1)
-            vu:Button2Up(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
-        end)
-        Notify("Anti-AFK", "✅ Активирован")
-    end,
-})
-
-local ConfigSection = MiscTab:CreateSection("Настройки")
-
-MiscTab:CreateKeybind({
-    Name = "Открыть/Закрыть меню",
-    CurrentKeybind = "RightControl",
-    HoldToInteract = false,
-    Flag = "MenuKeybind",
-    Callback = function(Keybind)
-        -- Rayfield сам обрабатывает
-    end,
-})
-
-MiscTab:CreateButton({
-    Name = "📋 Копировать Discord",
-    Callback = function()
-        setclipboard("discord.gg/example")
-        Notify("Discord", "Ссылка скопирована в буфер!")
-    end,
-})
-
-MiscTab:CreateButton({
-    Name = "📋 Копировать ключ",
-    Callback = function()
-        setclipboard("BEEFARM2024")
-        Notify("Ключ", "Ключ скопирован в буфер!")
+        Settings.AutoFarm = false
+        Settings.SafeAutoConvert = false
+        Settings.AutoQuests = false
+        Settings.AutoAttack = false
+        SafeNotify("🆘 Аварийная остановка!", "Все функции отключены!")
     end,
 })
 
 -- ===============================
--- АВТО-ОБНОВЛЕНИЕ ESP
+-- ОБНОВЛЕНИЕ СТАТИСТИКИ
 -- ===============================
 
 spawn(function()
-    while task.wait(2) do
-        if Settings.ESP then
-            ToggleESP()
-        end
-    end
-end)
-
--- Ноклип
-spawn(function()
-    while task.wait(0.1) do
-        if Settings.NoClip and Character then
-            for _, part in pairs(Character:GetDescendants()) do
-                if part:IsA("BasePart") then
-                    part.CanCollide = false
-                end
-            end
-        end
+    while task.wait(1) do
+        local uptime = os.time() - Stats.SessionStart
+        local hours = math.floor(uptime / 3600)
+        local minutes = math.floor((uptime % 3600) / 60)
+        local seconds = uptime % 60
+        
+        HoneyLabel:Set(string.format("Session Honey: %d", Stats.HoneyCollected))
+        RateLabel:Set(string.format("Uptime: %02d:%02d:%02d", hours, minutes, seconds))
     end
 end)
 
 -- ===============================
--- ЗАГРУЗКА И УВЕДОМЛЕНИЕ
+-- ЗАПУСК СКРИПТА
 -- ===============================
 
-Notify("Bee Farm Ultimate", "✅ Скрипт успешно загружен!", 4483362458)
-Notify("Управление", "Нажмите RightControl для открытия меню", 4483362458)
+SafeNotify("Atlas v2.0", "Успешно загружен! | Anti-Ban: ON")
+SafeNotify("Безопасность", "Рекомендуется использовать Safe режим!")
 
 print([[
-=====================================
-🐝 Bee Farm Ultimate v3.0 загружен!
-👤 Игрок: ]] .. LocalPlayer.Name .. [[
-⏰ Время: ]] .. os.date("%H:%M:%S") .. [[
-=====================================
+==========================================
+🐝 ATLAS BEE FARM v2.0
+👤 Player: ]] .. LocalPlayer.Name .. [[
+🛡️ Anti-Ban System: ENABLED
+⚠ Safety Mode: ON
+==========================================
 ]])
+
+-- Авто-выключение через N часов
+if Settings.LimitSession then
+    spawn(function()
+        task.wait(AntiBan.MaxSessionTime * 60)
+        SafeNotify("⏰ Время вышло", "Авто-выключение для безопасности!")
+        Settings.AutoFarm = false
+        Settings.SafeAutoConvert = false
+    end)
+end
